@@ -7,7 +7,7 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql
+LIBS=fmt sdl ssl openal ui uv mysql sqlite
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
@@ -43,6 +43,8 @@ UV = libs/uv/uv.o
 UI = libs/ui/ui_stub.o
 
 MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/my_api.o libs/mysql/mysql.o
+
+SQLITE = libs/sqlite/sqlite.o include/sqlite/src/sqlite3.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -158,6 +160,9 @@ uv: ${UV} libhl
 
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
+
+sqlite: ${SQLITE} libhl
+	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl
 
 mesa:
 	(cd libs/mesa && make)
