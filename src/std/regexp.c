@@ -20,63 +20,60 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
-
-#include <pcre2.h>
+#define PCRE_STATIC
+#include <pcre.h>
 
 typedef struct _ereg ereg;
 
+static pcre16_extra limit;
+
 struct _ereg {
 	void (*finalize)( ereg * );
-	/* The compiled regex code */
-	pcre2_code *regex;
-	/* Pointer to the allocated memory for match data */
-	pcre2_match_data *match_data;
-	/* Number of capture groups */
-	int n_groups;
-	/* Whether the last string was matched successfully */
+	pcre16 *p;
+	int *matches;
+	int nmatches;
 	bool matched;
 };
 
 static void regexp_finalize( ereg *e ) {
-	pcre2_code_free(e->regex);
-	pcre2_match_data_free(e->match_data);
+	pcre16_free(e->p);
+	free(e->matches);
 }
 
 HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	ereg *r;
-	int error_code;
-	size_t error_offset;
-	pcre2_code *p;
+	const char *error;
+	int err_offset;
+	int errorcode;
+	pcre16 *p;
 	uchar *o = (uchar*)opts;
-	int options = PCRE2_UCP | PCRE2_UTF | PCRE2_ALT_BSUX | PCRE2_ALLOW_EMPTY_CLASS | PCRE2_MATCH_UNSET_BACKREF;
+	int options = PCRE_JAVASCRIPT_COMPAT | PCRE_UCP | PCRE_UTF16;
 	while( *o ) {
 		switch( *o++ ) {
 		case 'i':
-			options |= PCRE2_CASELESS;
+			options |= PCRE_CASELESS;
 			break;
 		case 's':
-			options |= PCRE2_DOTALL;
+			options |= PCRE_DOTALL;
 			break;
 		case 'm':
-			options |= PCRE2_MULTILINE;
+			options |= PCRE_MULTILINE;
 			break;
 		case 'u':
 			break;
 		case 'g':
-			options |= PCRE2_UNGREEDY;
+			options |= PCRE_UNGREEDY;
 			break;
 		default:
 			return NULL;
 		}
 	}
-	p = pcre2_compile((PCRE2_SPTR)str,PCRE2_ZERO_TERMINATED,options,&error_code,&error_offset,NULL);
+	p = pcre16_compile2((PCRE_SPTR16)str,options,&errorcode,&error,&err_offset,NULL);
 	if( p == NULL ) {
 		hl_buffer *b = hl_alloc_buffer();
 		vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
-		PCRE2_UCHAR error_buffer[256];
-		pcre2_get_error_message(error_code,error_buffer,sizeof(error_buffer));
 		hl_buffer_str(b,USTR("Regexp compilation error : "));
-		hl_buffer_str(b,error_buffer);
+		hl_buffer_cstr(b,error);
 		hl_buffer_str(b,USTR(" in "));
 		hl_buffer_str(b,(uchar*)str);
 		d->v.bytes = (vbyte*)hl_buffer_content(b,NULL);
@@ -84,25 +81,25 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	}
 	r = (ereg*)hl_gc_alloc_finalizer(sizeof(ereg));
 	r->finalize = regexp_finalize;
-	r->regex = p;
+	r->p = p;
+	r->nmatches = 0;
 	r->matched = 0;
-	r->n_groups = 0;
-	pcre2_pattern_info(p,PCRE2_INFO_CAPTURECOUNT,&r->n_groups);
-	r->n_groups++;
-	r->match_data = pcre2_match_data_create_from_pattern(r->regex,NULL);
-
+	pcre16_fullinfo(p,NULL,PCRE_INFO_CAPTURECOUNT,&r->nmatches);
+	r->nmatches++;
+	r->matches = (int*)malloc(sizeof(int) * 3 * r->nmatches);
+	limit.flags = PCRE_EXTRA_MATCH_LIMIT_RECURSION;
+	limit.match_limit_recursion = 3500; // adapted based on Windows 1MB stack size
 	return r;
 }
 
 HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 	int start;
-	size_t *matches = pcre2_get_ovector_pointer(e->match_data);
 	if( !e->matched )
-		hl_error("Calling regexp_matched_pos() on an unmatched regexp");
-	if( m < 0 || m >= e->n_groups )
+		hl_error("Calling matchedPos() on an unmatched regexp");
+	if( m < 0 || m >= e->nmatches )
 		hl_error("Matched index %d outside bounds",m);
-	start = (int)matches[m*2];
-	if( len ) *len = (int)matches[m*2+1] - start;
+	start = e->matches[m*2];
+	if( len ) *len = e->matches[m*2+1] - start;
 	return start;
 }
 
@@ -110,16 +107,16 @@ HL_PRIM int hl_regexp_matched_num( ereg *e ) {
 	if( !e->matched )
 		return -1;
 	else
-		return e->n_groups;
+		return e->nmatches;
 }
 
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
-	int res = pcre2_match(e->regex,(PCRE2_SPTR)s,pos+len,pos,PCRE2_NO_UTF_CHECK,e->match_data,NULL);
+	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)s,pos+len,pos,PCRE_NO_UTF16_CHECK,e->matches,e->nmatches * 3);
 	e->matched = res >= 0;
 	if( res >= 0 )
 		return true;
-	if( res != PCRE2_ERROR_NOMATCH )
-		hl_error("An error occurred while running pcre2_match()");
+	if( res != PCRE_ERROR_NOMATCH )
+		hl_error("An error occurred while running pcre_exec");
 	return false;
 }
 

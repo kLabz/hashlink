@@ -59,33 +59,7 @@ include_directories(
 )
 
 file(GLOB pcre_srcs
-    include/pcre/pcre2_auto_possess.c
-    include/pcre/pcre2_chartables.c
-    include/pcre/pcre2_compile.c
-    include/pcre/pcre2_config.c
-    include/pcre/pcre2_context.c
-    include/pcre/pcre2_convert.c
-    include/pcre/pcre2_dfa_match.c
-    include/pcre/pcre2_error.c
-    include/pcre/pcre2_extuni.c
-    include/pcre/pcre2_find_bracket.c
-    include/pcre/pcre2_jit_compile.c
-    include/pcre/pcre2_maketables.c
-    include/pcre/pcre2_match_data.c
-    include/pcre/pcre2_match.c
-    include/pcre/pcre2_newline.c
-    include/pcre/pcre2_ord2utf.c
-    include/pcre/pcre2_pattern_info.c
-    include/pcre/pcre2_script_run.c
-    include/pcre/pcre2_serialize.c
-    include/pcre/pcre2_string_utils.c
-    include/pcre/pcre2_study.c
-    include/pcre/pcre2_substitute.c
-    include/pcre/pcre2_substring.c
-    include/pcre/pcre2_tables.c
-    include/pcre/pcre2_ucd.c
-    include/pcre/pcre2_valid_utf.c
-    include/pcre/pcre2_xclass.c
+    include/pcre/*.c
 )
 
 file(GLOB std_srcs
@@ -165,7 +139,7 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
 )
 
 if (WITH_VM)
