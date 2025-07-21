@@ -67,10 +67,6 @@ extern void sys_global_exit();
 #	define _CrtCheckMemory()
 #endif
 
-#if defined(HL_LINUX) || defined(HL_MAC)
-#	include <execinfo.h>
-#endif
-
 static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 #ifdef HL_WIN_DESKTOP
 	static HANDLE stack_process_handle = NULL;
@@ -96,18 +92,6 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		*outSize = usprintf(out,*outSize,USTR("%s(%s:%d)"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
 		return out;
 	}
-#elif defined(HL_LINUX) || defined(HL_MAC)
-	void *array[1];
-	char **strings;
-	array[0] = addr;
-	strings = backtrace_symbols(array, 1);
-	if (strings != NULL) {
-		*outSize = (int)strlen(strings[0]) << 1;
-		out = (uchar*)hl_gc_alloc_noptr(*outSize);
-		hl_from_utf8(out,*outSize,strings[0]);
-		free(strings);
-		return out;
-	}
 #endif
 	return NULL;
 }
@@ -124,12 +108,8 @@ static int hlc_capture_stack( void **stack, int size ) {
 #	endif
 #	ifdef HL_WIN_DESKTOP
 	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
-#	elif defined(HL_LINUX)
-	count = backtrace(stack, size) - 8;
-#	elif defined(HL_MAC)
-	count = backtrace(stack, size) - 6;
-#	endif
 	if( count < 0 ) count = 0;
+#	endif
 	return count;
 }
 
