@@ -183,6 +183,14 @@ static char* hl_sys_android_get_absolute_path_from(const char* method, const cha
 		}
 
 		mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, context), method, signature);
+		if (!mid) {
+			/* A failed lookup leaves a pending exception; calling through a NULL
+			   method id aborts the process under CheckJNI rather than failing here. */
+			(*env)->ExceptionClear(env);
+			LOGE("Couldn't find %s%s on the specified context", method, signature);
+			return NULL;
+		}
+
 		fileObject = (*env)->CallObjectMethod(env, context, mid, NULL);
 		if (!fileObject) {
 			LOGE("Couldn't call %s%s on the specified context", method, signature);
@@ -221,7 +229,10 @@ static const char* hl_sys_android_get_internal_storage_path(void)
 {
 	/* Internal storage is always available */
 	if (!hl_android_internal_files_path) {
-		hl_android_internal_files_path = hl_sys_android_get_absolute_path_from("getFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
+		/* getFilesDir() takes no argument; the String signature belongs to
+		   getExternalFilesDir(). With the wrong one GetMethodID returns NULL and
+		   the CallObjectMethod below aborts the process under CheckJNI. */
+		hl_android_internal_files_path = hl_sys_android_get_absolute_path_from("getFilesDir", "()Ljava/io/File;");
 	}
 
 	return hl_android_internal_files_path;
