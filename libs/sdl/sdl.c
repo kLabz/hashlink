@@ -638,8 +638,13 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	SDL_RaiseWindow(win); // better first focus lost behavior
 #	endif
 
-	// SDL2 compat
+	// SDL2 compat: SDL2 had text input on by default, SDL3 requires it explicitly.
+	// Not on android, where this is exactly what raises the on-screen keyboard —
+	// at window creation, before anything is focused. There the app drives it from
+	// text-input focus/blur via the text_input primitive below.
+#	ifndef HL_ANDROID
 	SDL_StartTextInput(win);
+#	endif
 	return win;
 }
 
