@@ -352,6 +352,8 @@ HL_PRIM connection *HL_NAME(connect_wrap)( cnx_params *p ) {
 		hl_buffer_cstr(b, "Failed to connect to mysql server : ");
 		hl_buffer_cstr(b,mysql_error(c->c));
 		mysql_close(c->c);
+		// leave no dangling pointer: the finalizer (close_wrap) would free it again
+		c->c = NULL;
 		hl_throw_buffer(b);
 	}
 	return c;
