@@ -478,6 +478,22 @@ HL_PRIM void HL_NAME(text_input)( bool enable ) {
 	}
 }
 
+HL_PRIM bool HL_NAME(screen_keyboard_shown)() {
+	bool visible = false;
+	SDL_Window **windows = SDL_GetWindows(NULL);
+	if (windows) {
+		int i;
+		for (i = 0; windows[i]; ++i) {
+			if (SDL_ScreenKeyboardShown(windows[i])) {
+				visible = true;
+				break;
+			}
+		}
+		SDL_free(windows);
+	}
+	return visible;
+}
+
 
 // SDL2 compat: We need to internally store relative mouse mode state
 static bool relative_mouse_mode = false;
@@ -565,6 +581,7 @@ DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
+DEFINE_PRIM(_BOOL, screen_keyboard_shown, _NO_ARG);
 DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
 DEFINE_PRIM(_BOOL, get_relative_mouse_mode, _NO_ARG);
 DEFINE_PRIM(_I32, capture_mouse, _BOOL);
