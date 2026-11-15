@@ -28,6 +28,11 @@ typedef int SOCKET;
 #include "mbedtls/x509.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/oid.h"
+#if MBEDTLS_VERSION_MAJOR >= 4
+#include "mbedtls/psa_util.h"
+#else
+#include "mbedtls/pkcs5.h"
+#endif
 #if MBEDTLS_VERSION_MAJOR < 4
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
@@ -889,7 +894,37 @@ HL_PRIM bool HL_NAME(dgst_verify)(vbyte *data, int dlen, vbyte *sign, int slen, 
 	return true;
 }
 
+HL_PRIM vbyte *HL_NAME(dgst_pbkdf2)(vbyte *pass, int plen, vbyte *salt, int slen, int iterations, int klen, vbyte *alg) {
+	mbedtls_md_type_t type = md_type_from_string((char*)alg);
+	vbyte *out = hl_gc_alloc_noptr(klen);
+	int r;
+	hl_blocking(true);
+#if MBEDTLS_VERSION_MAJOR >= 4
+	psa_key_derivation_operation_t op = PSA_KEY_DERIVATION_OPERATION_INIT;
+	psa_crypto_init();
+	r = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(mbedtls_md_psa_alg_from_type(type)));
+	if (r == PSA_SUCCESS) r = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, (uint64_t)iterations);
+	if (r == PSA_SUCCESS) r = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, slen);
+	if (r == PSA_SUCCESS) r = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, pass, plen);
+	if (r == PSA_SUCCESS) r = psa_key_derivation_output_bytes(&op, out, klen);
+	psa_key_derivation_abort(&op);
+#else
+	mbedtls_md_context_t ctx;
+	mbedtls_md_init(&ctx);
+	r = mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(type), 1);
+	if (r == 0) r = mbedtls_pkcs5_pbkdf2_hmac(&ctx, pass, plen, salt, slen, (unsigned int)iterations, (uint32_t)klen, out);
+	mbedtls_md_free(&ctx);
+#endif
+	hl_blocking(false);
+	if (r != 0) {
+		hl_error("pbkdf2 failed: %d", r);
+		return NULL;
+	}
+	return out;
+}
+
 DEFINE_PRIM(_BYTES, dgst_make, _BYTES _I32 _BYTES _REF(_I32));
+DEFINE_PRIM(_BYTES, dgst_pbkdf2, _BYTES _I32 _BYTES _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_BYTES, dgst_sign, _BYTES _I32 TPKEY _BYTES _REF(_I32));
 DEFINE_PRIM(_BOOL, dgst_verify, _BYTES _I32 _BYTES _I32 TPKEY _BYTES);
 
